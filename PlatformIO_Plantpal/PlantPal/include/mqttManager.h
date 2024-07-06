@@ -5,6 +5,7 @@
 #include <WiFi.h>
 #include <PubSubClient.h>
 #include <ArduinoJson.h> // Include ArduinoJson library
+#include <omegaPlant.h>
 
 #define ID 1
 uint8_t hi = (uint8_t)'P';
@@ -19,10 +20,12 @@ const char *password = "49937025"; // Replace with your Wi-Fi password
 const char *mqtt_server = "192.168.2.5";
 const char *mqtt_user = "containership";
 const char *mqtt_pass = MQTT_PASSWORD;
+const char * friendly_name = "PlantPalF0";
 
-const char *alive_topic = "plantpal/alive/#";
-const char *sensor_topic = "plantpal/sensors/#";
-const char *config_topic = "plantpal/config/#";
+
+const char *alive_topic = "plantpal/alive";
+const char *sensor_topic = "plantpal/sensor";
+const char *config_topic = "plantpal/config";
 
 WiFiClient espClient;
 PubSubClient client(espClient);
@@ -35,10 +38,13 @@ typedef struct sensorDataPacket{
     uint8_t hum;
     uint8_t light;
     uint8_t moist;
-
+    uint8_t xp;
+    uint8_t mood;
 };
 
 sensorDataPacket curData;
+PlantProfile curProfile;
+PlantSaveData curSave;
 
 void setup_wifi() {
 
@@ -52,7 +58,7 @@ void setup_wifi() {
     if (counter % 10 == 0) {
      
     }
-    delay(1);
+    vTaskDelay(1);
   }
 
   if (WiFi.status() == WL_CONNECTED) {
@@ -71,21 +77,23 @@ void reconnect() {
   while (!client.connected()) {
     Serial.print("Attempting MQTT connection...");
     // Attempt to connect
-    if (client.connect("ESP32Client", mqtt_user, mqtt_pass)) {
+    if (client.connect(friendly_name, mqtt_user, mqtt_pass)) {
       Serial.println("connected");
-      delay(1000);
+      vTaskDelay(100);
       // Once connected, publish an "alive" message
-      client.publish(alive_topic, "PlantPal is alive");
+      client.publish(alive_topic, friendly_name);
       // Subscribe to the configuration topic
       client.subscribe(config_topic);
       client.subscribe(sensor_topic);
+
     } else {
       Serial.print("failed, rc=");
       Serial.print(client.state());
       Serial.println(" try again in 5 seconds");
       // Wait 5 seconds before retrying
-      delay(5000);
+      vTaskDelay(5000);
     }
+    
   }
 }
 
@@ -111,12 +119,14 @@ void publishSensorData() {
 }
 
 void callback(char* topic, byte* payload, unsigned int length) {
- /* Serial.print("Message arrived [");
+
+  Serial.print("Message arrived [");
   Serial.print(topic);
   Serial.print("] ");
   for (unsigned int i = 0; i < length; i++) {
     Serial.print((char)payload[i]);
   }
+  Serial.println();
   Serial.println();
   // Handle the configuration message if needed
  StaticJsonDocument<256> doc;
@@ -129,11 +139,38 @@ void callback(char* topic, byte* payload, unsigned int length) {
 
         // Example: Extract values from the parsed JSON document
         if (doc.containsKey("id")) {
-            curData.id = doc["command"].as<uint16_t>();
+          
+          if(String(sensor_topic) == String(topic)){
+            
+            curData.id = doc["id"].as<uint16_t>();
+            curData.tempc = doc["tempc"].as<uint8_t>();
+            curData.hum = doc["hum"].as<uint8_t>();  
+            curData.moist = doc["soilm"].as<uint8_t>();
+            curData.light = doc["light"].as<uint8_t>();
+            curData.xp = doc["xp"].as<uint8_t>();
+            curData.mood = doc["mood"].as<uint8_t>();
+          }
+          
+          if(String(config_topic) == String(topic)){
+            
+            curData.id = doc["id"].as<uint16_t>();
+            //curProfile.name = doc["name"].as<const char>();
+            curProfile.tempc = doc["tempc"].as<uint8_t>();
+            curProfile.hum = doc["hum"].as<uint8_t>();
+            curProfile.soil_moisture = doc["soil_moisture"].as<uint8_t>();
+            curProfile.light = doc["light"].as<uint8_t>();
+            curProfile.range_temp = doc["range_temp"].as<uint8_t>();
+            curProfile.range_hum = doc["range_hum"].as<uint8_t>();
+            curProfile.range_light = doc["range_light"].as<uint8_t>();
+            curProfile.range_soil_moisture = doc["range_soil_moisture"].as<uint8_t>();
+
+          }
+          
+
         }
 
 
 
-*/
+
 }
 #endif

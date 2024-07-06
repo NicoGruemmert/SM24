@@ -66,11 +66,11 @@ struct PlantProfile
     uint8_t tempc =22;
     uint8_t hum = 60;
     uint8_t soil_moisture = 50;
-    unsigned int light = 10000;
+    uint8_t light = 100;
     
     uint8_t range_temp = 5;
     uint8_t range_hum = 30;
-    uint32_t range_light = 100;
+    uint8_t range_light = 100;
     uint8_t range_soil_moisture = 100;
 
    
@@ -88,9 +88,7 @@ struct sensorData{
 
 struct PlantSaveData{
     uint8_t plantID = 0;
-
     PlantProfile savedProfile;
-    
     uint16_t savedExp= 0;
     uint16_t unlockedItems= 0;
     uint16_t unlockedBg= 0;
@@ -262,6 +260,7 @@ uint8_t omegaPlant::calculateLevel(uint32_t exp) {
 
     return level;
 }
+
 
 uint8_t omegaPlant::getRCMD(sensorData newData) {
     // Access the current plant profile

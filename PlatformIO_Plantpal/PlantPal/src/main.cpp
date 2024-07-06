@@ -139,19 +139,23 @@ void dpTask(void * pvParameters)
 }
 
 void wifiTask(void * params){
-  vTaskDelay(500);
+
+  
   //wifiMQTTManager.setup();
   setup_wifi();
-  delay(200);
+  vTaskDelay(200);
+  client.setKeepAlive(60);
+  client.setCallback(callback);
   client.setServer(mqtt_server, 1883);
   vTaskDelay(200);
   while (1)
   {
      if (!client.connected()) {
+    vTaskDelay(2000);
     reconnect();
   }
   client.loop();
-  vTaskDelay(20);
+  vTaskDelay(1);
   // Publish sensor data every 10 seconds
 
   
@@ -166,34 +170,16 @@ void updateEncoder(){myRotor.tick();}
 
 void updateSW(){
   //myMenu->getCurrentMenu()->selectMenu();
-  
-
         if (digitalRead(PIN_SW)) currentEvent = CLICK;
-
-    
   };
 
 void setup(void) {
   Serial.begin(115200);
   Wire.begin();
   
-  while (!Serial)
-  {
-    delay(100);
-  }
-  
-
-//WiFi.begin(ssid,password);
-  // createSprite() buggy in einem Task!!!
+ 
   menuSprite.createSprite(240,240);
 
-
-
-
-    
-    //i2cWire.begin();
-    //while (!Serial)
-    //initWifi();
     
     pinMode(PIN_SW, INPUT_PULLUP); // Rotary Encoder Schalter Pin
     pinMode(PIN_DT, INPUT_PULLUP); // Rotary Encoder DT Pin
@@ -236,9 +222,9 @@ void setup(void) {
       xTaskCreate(
         wifiTask,      // Function name of the task
         "Wifi_Task",   // Name of the task (e.g. for debugging)
-        20000,        // Stack size (bytes)
+        8192,        // Stack size (bytes)
         NULL,        // Parameter to pass
-        1,           // Task priority
+        5,           // Task priority
         &wifiTaskHandle         // Task handle
     );
 

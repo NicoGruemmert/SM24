@@ -27,7 +27,7 @@ PlantProfile newProfile;
 omegaPlant myPlant = omegaPlant(newProfile);
 
 extern sensorDataPacket curData;
-
+extern PlantSaveData curSave;
  bool espNowActive= false;
 
 TFT_eSPI tft =TFT_eSPI();  // Create object "tft"
@@ -42,7 +42,9 @@ struct Arc {
     int endAngle;
     uint16_t color;
     int value;
-    char unit[2];
+    char unit;
+    int min;
+    int max;
 };
 
 
@@ -90,7 +92,8 @@ void animateAvatar(TFT_eSPI* tft,TFT_eSprite * avatarSprite, uint8_t frame)
   itemSprite.pushImage(0,0,50,10,icon_sunglasses);
   if(frame>3) return;
 
-  avatarSprite->pushImage(0,0,120,120,plantArray[1]);
+  uint8_t avatarInt = curData.hum%3;
+  avatarSprite->pushImage(0,0,120,120,plantArray[avatarInt]);
   itemSprite.pushToSprite(avatarSprite,40+frame*4,30-frame*3,0);
 }
 
@@ -100,16 +103,17 @@ void createArc(TFT_eSprite * arcSprite,Arc arcData)
   arcSprite->fillScreen(0);
   arcSprite->drawSmoothArc(16,16,arcData.radius,arcData.width,arcData.startAngle,arcData.endAngle,arcData.color,TFT_TRANSPARENT,true);
   arcSprite->drawFastVLine(16,0,7,TFT_WHITE);
-  arcSprite->setCursor(10,28);
+  arcSprite->setCursor(5,28);
   arcSprite->setTextColor(arcData.color);
   arcSprite->printf("%d",arcData.value);
   arcSprite->print(arcData.unit);
+
 }
 
 void calculate_arc_positions(Arc arcs[], int numArcs) {
 const int displayRadius = 120;  // Half of the display's diameter (240/2)
     const int arcRadius = 16;       // Radius of the arcs
-    const int centerOffset = 25;    // Distance from the edge of the display to the center of each arc
+    const int centerOffset = 30;    // Distance from the edge of the display to the center of each arc
     const int arcAngle = 360;       // Angle span of each arc
     const int arcWidth = 14;        // Width of each arc
     const uint16_t arcColor = TFT_GOLD;  // Color of the arcs
@@ -159,13 +163,7 @@ bool drawHomeScreen(TFT_eSPI* tft,TFT_eSprite * mainSprite)
         spritesInitialized = true;
     }
   
-  static int val1 = 0;
-  static int val2 = 0;
-  static int val3 = 0;
 
-  val1 = val1%100;
-  val2 = val2%100;
-  val3= val3%100;
   frameCounter = frameCounter%100;
 
   if(frameCounter<20)animationIndex =0;
@@ -174,38 +172,43 @@ bool drawHomeScreen(TFT_eSPI* tft,TFT_eSprite * mainSprite)
   else if(frameCounter<25)animationIndex =1;
   else if(frameCounter<100)animationIndex =0;
   
-  
-  if(val1==0) val1=1;
-  if(val2==0) val2=1;
-  if(val3==0) val3=1;
 
   uint16_t offset = 50;
   uint16_t startAngl = 45;
   uint16_t endAngl = 315;
 
-  uint16_t angl1 = map(val1,-1, 101,startAngl,endAngl);
-  uint16_t angl2 = map(val2,-1, 101,startAngl,endAngl);
-  uint16_t angl3 = map(val3,-1, 101,startAngl,endAngl);  
+  Arc valArcs[4];
+  calculate_arc_positions(valArcs,4);  
 
-  mainSprite->setSwapBytes(1);
-  mainSprite->fillScreen(0);
+  Serial.printf("Rangetemp: %d", curProfile.range_temp);
+
+  uint16_t tempc_angle = map(curData.tempc,18, (curProfile.tempc+curProfile.range_temp),startAngl,endAngl);
+  uint16_t hum_angle = map(curData.hum,(curProfile.hum-curProfile.range_hum),(curProfile.hum+curProfile.range_hum),startAngl,endAngl);
+  uint16_t light_angle = map(curData.light,(curProfile.light-curProfile.range_light), (curProfile.light+curProfile.range_light),startAngl,endAngl);
+  uint16_t soil_angle = map(curData.moist,(curProfile.soil_moisture-curProfile.range_soil_moisture), (curProfile.soil_moisture+curProfile.range_soil_moisture),startAngl,endAngl);  
+  
+  uint16_t soil_mood = map(curData.moist,(curProfile.soil_moisture-curProfile.range_soil_moisture), (curProfile.soil_moisture+curProfile.range_soil_moisture),startAngl,endAngl);  
+  uint16_t soil_xp = map(curData.moist,(curProfile.soil_moisture-curProfile.range_soil_moisture), (curProfile.soil_moisture+curProfile.range_soil_moisture),startAngl,endAngl);  
+  
+    
+  if(tempc_angle>endAngl) tempc_angle = endAngl;
+  if(hum_angle>endAngl) hum_angle = endAngl;
+  if(light_angle>endAngl) light_angle = endAngl;
+  if(soil_angle>endAngl) soil_angle = endAngl;
+  
 
   //Arcs
-  Arc valArcs[4];
 
-  calculate_arc_positions(valArcs,4);
 
-   
+  valArcs[0].endAngle = light_angle;
+  valArcs[1].endAngle = tempc_angle;
+  valArcs[2].endAngle = hum_angle;
+  valArcs[3].endAngle = soil_angle;
 
-  valArcs[0].endAngle = angl1;
-  valArcs[1].endAngle = angl2;
-  valArcs[2].endAngle = angl3;
-  valArcs[3].endAngle = angl3;
-
-  valArcs[0].value = val1;
-  valArcs[1].value = val2;
-  valArcs[2].value = val3;
-  valArcs[3].value = val3;
+  valArcs[0].value = curData.light;
+  valArcs[1].value = curData.tempc;
+  valArcs[2].value = curData.hum;
+  valArcs[3].value = curData.moist;
 
   //valArcs[0].unit = "C";
   //valArcs[1].unit = "%";
@@ -219,17 +222,21 @@ bool drawHomeScreen(TFT_eSPI* tft,TFT_eSprite * mainSprite)
   valArcs[3].color = COLOR_BROWN;
 
   // Bottom Text
+    
+  mainSprite->setSwapBytes(1);
+  mainSprite->fillScreen(0);
 
   txtSprite.fillScreen(TFT_BLACK);
   txtSprite.setCursor(0,0);
   txtSprite.setTextColor(TFT_WHITE);
   //txtSprite.printf("Age: %d Days\n",val1);  
+  uint8_t level = myPlant.calculateLevel(curData.xp);
+ uint8_t xp_progress = abs(curData.xp - (level-1)*2);
+  
+  
 
   txtSprite.setTextColor(0x3F29);
-  txtSprite.printf("  %d%%\n",99);
-
-  txtSprite.setTextColor(0x5D83);
-  txtSprite.printf("%dXP",100);
+txtSprite.printf("Mood\n  %d%%",curData.mood);
 
   txtSprite.setSwapBytes(1);
   txtSprite.setTextColor(TFT_WHITE);
@@ -239,19 +246,36 @@ bool drawHomeScreen(TFT_eSPI* tft,TFT_eSprite * mainSprite)
   txtSprite.setTextColor(TFT_WHITE);
   txtSprite.setCursor(0,0);
 
+  
   txtSprite.setTextColor(TFT_SILVER);
-  txtSprite.printf("Level: %d",val1);
-  txtSprite.pushToSprite(mainSprite,80,30);
+  txtSprite.printf("Level\n    %d\n",level);
+  txtSprite.pushToSprite(mainSprite,180,90);
+
+  txtSprite.fillScreen(0);
+  txtSprite.setTextColor(TFT_GOLD);
+  txtSprite.setCursor(0,0);
+  txtSprite.printf(" %dXP",xp_progress);
+  txtSprite.pushToSprite(mainSprite,180,125);
 
 
-  mainSprite->drawSmoothArc(120,120,118,110,180+offset,360-offset,0x5D83,TFT_TRANSPARENT,true);
-  mainSprite->drawSmoothArc(120,120,106,102,180+offset,360-offset,0x3F29,TFT_TRANSPARENT,true);
+  uint16_t mood_angle = map(curData.mood,-1,101,360-offset,180+offset);  
+  uint16_t xp_angle = map(xp_progress,0,level*2,360-offset,180+offset); //Real magic numbers here! 
+  
+  if (mood_angle > 360-offset) mood_angle = 180+offset;  
+  if (xp_angle > 360-offset) xp_angle = 360-offset;
+  if (xp_angle <  180+offset) xp_angle =  180+offset;
 
+  mainSprite->drawSmoothArc(120,120,118,110,mood_angle,360-offset,0x3F29,TFT_TRANSPARENT,true);
+
+  mainSprite->drawSmoothArc(120,120,106,102,xp_angle,360-offset,TFT_GOLD,TFT_TRANSPARENT,true);
+  mainSprite->drawFastHLine(190,120,40,TFT_WHITE);
   int iPlant =(frameCounter/(100/plantArrLen))%plantArrLen;
   //mainSprite->drawFastHLine(0,120,35,TFT_WHITE);
   mainSprite->setCursor(80,10);
   
-  mainSprite->printf("Plant %d",curData.id);
+    char msb = (char)((curData.id >> 8) & 0xFF); // Most significant byte (MSB)
+    char lsb = (char)(curData.id & 0xFF);        // Least significant byte (LSB)
+  mainSprite->printf("Plant %c%d",msb,lsb);
 
   animateAvatar(tft,&avatarSprite,animationIndex);
 
@@ -264,12 +288,7 @@ bool drawHomeScreen(TFT_eSPI* tft,TFT_eSprite * mainSprite)
 
   for (int i = 0; i < 4;i++) {
       createArc(&arcSprite,valArcs[i]);
-
         arcSprite.pushToSprite(mainSprite,valArcs[i].cx-16, valArcs[i].cy-16);
-        
-        //mainSprite->drawSmoothArc(valArcs[i].cx, valArcs[i].cy, valArcs[i].radius, valArcs[i].width, valArcs[i].startAngle, valArcs[i].endAngle, valArcs[i].color, TFT_TRANSPARENT, true);
-        //mainSprite->drawFastVLine(valArcs[i].cx,valArcs[i].cy-18,7,TFT_WHITE);
-        //mainSprite->drawFastHLine(valArcs[i].cx-20,valArcs[i].cy,7,TFT_WHITE);
     }
 
   if (frameCounter <50 || frameCounter >75){
@@ -290,25 +309,23 @@ bool drawHomeScreen(TFT_eSPI* tft,TFT_eSprite * mainSprite)
 }else{
   
 
-
+if(curData.light<20){
   mainSprite->fillCircle(80,86,2,TFT_WHITE);
-  
+
   if (frameCounter>55) mainSprite->fillCircle(70,80,5,TFT_WHITE);
   //if (frameCounter>58)mainSprite->drawCircle(40,70,22, TFT_WHITE);
   if (frameCounter>58) mainSprite->fillCircle(40,70,22,TFT_WHITE);
 
   if (frameCounter>62) iconSprite.pushImage(0,0,40,40,icon_light);
   if (frameCounter>62) iconSprite.pushToSprite(mainSprite,20,50,TFT_BLACK);
-  
+} 
 }
   
 
   //mainSprite->fillCircle()
   mainSprite->pushSprite(0,0);
   //mainSprite->pushSprite(0,0);
-  val1++;
-  val2+=2;
-  val3+=3;
+
   frameCounter++;
   
 
@@ -433,6 +450,27 @@ std::vector<omegaTFT> macMenu(void)
 
 
 
+omegaTFT plantParams[]{
+omegaTFT(VALUE,"Temperature", curProfile.tempc),
+omegaTFT(VALUE,"Humidity", curProfile.hum),
+omegaTFT(VALUE,"Soil",curProfile.soil_moisture),
+omegaTFT(VALUE,"Light", curProfile.light),
+
+omegaTFT(VALUE,"Temp Range", curProfile.range_temp),
+omegaTFT(VALUE,"Hum Range", curProfile.range_hum),
+omegaTFT(VALUE,"Soil Range",curProfile.range_soil_moisture),
+omegaTFT(VALUE,"Light Range", curProfile.range_light),
+
+omegaTFT(EXIT,"Back")
+
+};
+
+omegaTFT plantMenu[]{
+omegaTFT(SUBMENU,"Plant 1", icon_potted_plant,plantParams,sizeof(plantParams)/sizeof(omegaTFT)),
+omegaTFT(SUBMENU,"Plant 2", icon_potted_plant,plantParams,sizeof(plantParams)/sizeof(omegaTFT)),
+omegaTFT(EXIT,"Back")
+
+};
 
 
 omegaTFT wifiMenu[]{
@@ -445,6 +483,7 @@ omegaTFT(EXIT,"Back")
 };
 
 omegaTFT settingsMenu [] = {
+  omegaTFT(SUBMENU,"Plant Profiles", icon_potted_plant,plantMenu,sizeof(plantMenu)/sizeof(omegaTFT)),
   omegaTFT(SUBMENU,"WiFi", icon_wifi,wifiMenu,sizeof(wifiMenu)/sizeof(omegaTFT)),
   omegaTFT(EMPTY,"BLE", icon_bluetooth),
   omegaTFT(EXIT,"Back")

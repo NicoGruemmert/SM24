@@ -15,6 +15,7 @@
 #define ICON_RADIUS (SCREEN_WIDTH / 2 - 30) // Abstand vom Rand
 
 
+
 enum menuType
 {
     EMPTY,
@@ -345,10 +346,11 @@ public:
             */
             menuSprite->setCursor(selectedIndent+ICON_SIZE+16,110);
             menuSprite->printf(subMenus[selectedItem].getName());
+
             if(subMenus[selectedItem].type==VALUE)
             {
                 
-                menuSprite->setCursor(SCREEN_WIDTH-80,110);
+                menuSprite->setCursor(200,110);
                 menuSprite->print(subMenus[selectedItem].getValue());
                 
             }
@@ -430,7 +432,7 @@ oldIndex = selectedItem;
                 valueSprite->fillScreen(TFT_BLACK);     
                 valueSprite->setCursor(0,valueSprite->height()/2 -10);        
                 valueSprite->println(dataValue);
-                valueSprite->pushSprite(SCREEN_WIDTH*0.75,SCREEN_HEIGHT *.25);
+                valueSprite->pushSprite(220,SCREEN_HEIGHT *.25);
             }
             break;
         case FUNCTION:
